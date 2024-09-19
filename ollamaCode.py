@@ -1,7 +1,7 @@
 import streamlit as st
+from langchain_community.llms import Ollama
 import time
 import pandas as pd
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Load the data from CSV files
 customers_df = pd.read_csv('data/customers_indian2.csv')
@@ -9,15 +9,16 @@ stores_df = pd.read_csv('data/stores_indian2.csv')
 orders_df = pd.read_csv('data/orders_indian2.csv')
 products_df = pd.read_csv('data/products_indian.csv')
 
-# Load the Hugging Face model and tokenizer
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+# Load the qwen2 model
+model = 'chatbot'  # Assuming 'chatbot' is the correct model identifier
 
 # Streamlit app setup
 st.set_page_config(page_title="RetailX Assistant Chatbot")
 with st.sidebar:
     st.title("RetailX Assistant Chatbot")
+
+# Initialize Ollama
+ollama = Ollama(model=model,base_url = 'https://10mmr0m2-11434.inc1.devtunnels.ms/')
 
 # Store LLM-generated responses
 if "messages" not in st.session_state.keys():
@@ -36,16 +37,10 @@ def clear_chat_history():
 st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
 def get_response(user_input, data):
-    # Generate a response from the Hugging Face model
-    messages = [
-        {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
-        {"role": "user", "content": user_input}
-    ]
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
-    generated_ids = model.generate(**model_inputs, max_new_tokens=512)
-    generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
-    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    # Generate a response from the model using the invoke method
+    conversation_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.messages])
+    response = ollama.invoke(input=f"DATA://{data}\n\n{conversation_history}\nuser: {user_input}")
+    print(conversation_history)
     return response
 
 def determine_dataset(query):
@@ -68,6 +63,7 @@ def determine_dataset(query):
         return None, None
 
 def chatbot(query):
+    # print(f"Received query: {query}")  # Print the query to the terminal?
     data_label, dataset = determine_dataset(query)
     if dataset is not None:
         data = str(dataset)
