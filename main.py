@@ -1,31 +1,33 @@
 import streamlit as st
+from langchain_community.llms import Ollama
 import time
 import pandas as pd
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Load the data from CSV files
+
 customers_df = pd.read_csv('data/customers_indian2.csv')
 stores_df = pd.read_csv('data/stores_indian2.csv')
 orders_df = pd.read_csv('data/orders_indian2.csv')
 products_df = pd.read_csv('data/products_indian.csv')
 
-# Load the Hugging Face model and tokenizer
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype="auto", device_map="auto")
-tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-# Streamlit app setup
+model = 'chatbot' 
+
+
 st.set_page_config(page_title="RetailX Assistant Chatbot")
 with st.sidebar:
     st.title("RetailX Assistant Chatbot")
 
-# Store LLM-generated responses
+
+ollama = Ollama(model=model,base_url="http://localhost:11434")
+
+ollama.invoke(input="Hello")
+
 if "messages" not in st.session_state.keys():
     st.session_state.messages = [{"role": "assistant", "content": "How may I assist you today?"}]
 if "data_context" not in st.session_state.keys():
     st.session_state.data_context = ""
 
-# Display or clear chat messages
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.write(message["content"])
@@ -36,16 +38,10 @@ def clear_chat_history():
 st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
 def get_response(user_input, data):
-    # Generate a response from the Hugging Face model
-    messages = [
-        {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
-        {"role": "user", "content": user_input}
-    ]
-    text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
-    generated_ids = model.generate(**model_inputs, max_new_tokens=512)
-    generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
-    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    
+    conversation_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.messages])
+    response = ollama.invoke(input=f"DATA://{data}\n\n{conversation_history}\nuser: {user_input}")
+    print(conversation_history)
     return response
 
 def determine_dataset(query):
@@ -68,32 +64,33 @@ def determine_dataset(query):
         return None, None
 
 def chatbot(query):
+
     data_label, dataset = determine_dataset(query)
     if dataset is not None:
         data = str(dataset)
-        # Update data_context with the latest dataset label
+        
         st.session_state.data_context = f"DATA://{data_label}"
         return get_response(query, data)
     else:
-        # If no specific dataset is found, clear the data_context
+        
         st.session_state.data_context = ""
         return get_response(query, "No specific dataset")
 
-# User-provided prompt
+
 if prompt := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
-# Generate a new response if the last message is not from the assistant
+
 if st.session_state.messages[-1]["role"] != "assistant":
     with st.chat_message("assistant"):
         response = chatbot(prompt)
         placeholder = st.empty()
         full_response = ''
-        for char in response:  # Assume response is a string
+        for char in response:  
             full_response += char
             placeholder.markdown(full_response)
-            time.sleep(0.05)  # Adjust the delay as needed
+            time.sleep(0.05) 
     message = {"role": "assistant", "content": full_response}
     st.session_state.messages.append(message)
