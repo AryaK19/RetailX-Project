@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\arya2\Arya Code\Python\Machine Learning\NLP(spacy,nltk)\New folder\venv"
+VIRTUAL_ENV="C:\Users\arya2\Arya Code\Python\Machine Learning\NLP(spacy,nltk)\RetailX Project\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
